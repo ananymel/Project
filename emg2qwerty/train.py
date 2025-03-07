@@ -20,12 +20,13 @@ from emg2qwerty import transforms, utils
 from emg2qwerty.transforms import Transform
 from pytorch_lightning.loggers import WandbLogger
 
-# create the W&B logger
-#wandb.finish()
 wandb_logger = WandbLogger(
-    project="my-emg-project_baseline_ll_relu_test",
-    name="my-run-name_baseline_test",
+    project="LSTMEncode_Bidirectional_ll_relu_hidden_size_128",
+    name="LSTMEncoders_Bidrectional_ll_relu_hidden_szie_128"
 )
+
+
+
 log = logging.getLogger(__name__)
 
 
@@ -99,7 +100,6 @@ def main(config: DictConfig):
     # Initialize trainer
     trainer = pl.Trainer(
         **config.trainer,
-        logger=wandb_logger,
         callbacks=callbacks,
     )
 

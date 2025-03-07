@@ -24,15 +24,13 @@ from emg2qwerty.metrics import CharacterErrorRates
 from emg2qwerty.modules import (
     MultiBandRotationInvariantMLP,
     SpectrogramNorm,
-    TDSConvEncoder,
+    #TDSConvEncoder,
+    TDSLSTMEncoder,
 )
 from emg2qwerty.transforms import Transform
-from pytorch_lightning.loggers import WandbLogger
 
-wandb_logger = WandbLogger(
-    project="baseline_ll_relu_test",
-    name="baseline_ll_relu_test"
-)
+
+
 
 class WindowedEMGDataModule(pl.LightningDataModule):
     def __init__(
@@ -174,18 +172,20 @@ class TDSConvCTCModule(pl.LightningModule):
             ),
             # (T, N, num_features)
             nn.Flatten(start_dim=2),
-            TDSConvEncoder(
+            # TDSConvEncoder(
+            #     num_features=num_features,
+            #     block_channels=block_channels,
+            #     kernel_width=kernel_width,
+            # ),
+            TDSLSTMEncoder(
                 num_features=num_features,
-                block_channels=block_channels,
-                kernel_width=kernel_width,
+                lstm_hidden_size = 128,
+                num_lstm_layers = 4,
             ),
             # (T, N, num_classes)
-            nn.Linear(num_features, 128),
+            nn.Linear(128,128),
             nn.ReLU(),
             nn.Linear(128, charset().num_classes),
-
-
-            #nn.Linear(num_features, charset().num_classes),
             nn.LogSoftmax(dim=-1),
         )
 

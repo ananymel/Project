@@ -240,41 +240,84 @@ class TDSFullyConnectedBlock(nn.Module):
         return self.layer_norm(x)  # TNC
 
 
-class TDSConvEncoder(nn.Module):
-    """A time depth-separable convolutional encoder composing a sequence
-    of `TDSConv2dBlock` and `TDSFullyConnectedBlock` as per
-    "Sequence-to-Sequence Speech Recognition with Time-Depth Separable
-    Convolutions, Hannun et al" (https://arxiv.org/abs/1904.02619).
+# class TDSConvEncoder(nn.Module):
+#     """A time depth-separable convolutional encoder composing a sequence
+#     of `TDSConv2dBlock` and `TDSFullyConnectedBlock` as per
+#     "Sequence-to-Sequence Speech Recognition with Time-Depth Separable
+#     Convolutions, Hannun et al" (https://arxiv.org/abs/1904.02619).
 
-    Args:
-        num_features (int): ``num_features`` for an input of shape
-            (T, N, num_features).
-        block_channels (list): A list of integers indicating the number
-            of channels per `TDSConv2dBlock`.
-        kernel_width (int): The kernel size of the temporal convolutions.
-    """
+#     Args:
+#         num_features (int): ``num_features`` for an input of shape
+#             (T, N, num_features).
+#         block_channels (list): A list of integers indicating the number
+#             of channels per `TDSConv2dBlock`.
+#         kernel_width (int): The kernel size of the temporal convolutions.
+#     """
 
-    def __init__(
-        self,
-        num_features: int,
-        block_channels: Sequence[int] = (24, 24, 24, 24),
-        kernel_width: int = 32,
-    ) -> None:
-        super().__init__()
+#     def __init__(
+#         self,
+#         num_features: int,
+#         block_channels: Sequence[int] = (24, 24, 24, 24),
+#         kernel_width: int = 32,
+#     ) -> None:
+#         super().__init__()
 
-        assert len(block_channels) > 0
-        tds_conv_blocks: list[nn.Module] = []
-        for channels in block_channels:
-            assert (
-                num_features % channels == 0
-            ), "block_channels must evenly divide num_features"
-            tds_conv_blocks.extend(
-                [
-                    TDSConv2dBlock(channels, num_features // channels, kernel_width),
-                    TDSFullyConnectedBlock(num_features),
-                ]
-            )
-        self.tds_conv_blocks = nn.Sequential(*tds_conv_blocks)
+#         assert len(block_channels) > 0
+#         tds_conv_blocks: list[nn.Module] = []
+#         for channels in block_channels:
+#             assert (
+#                 num_features % channels == 0
+#             ), "block_channels must evenly divide num_features"
+#             tds_conv_blocks.extend(
+#                 [
+#                     TDSConv2dBlock(channels, num_features // channels, kernel_width),
+#                     TDSFullyConnectedBlock(num_features),
+#                 ]
+#             )
+#         self.tds_conv_blocks = nn.Sequential(*tds_conv_blocks)
+
+#     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+#         return self.tds_conv_blocks(inputs)  # (T, N, num_features)
+
+class TDSLSTMEncoder(nn.Module):
+
+    def __init__(self, num_features: int, lstm_hidden_size: int = 128, num_lstm_layers: int = 4) -> None:
+        super(TDSLSTMEncoder, self).__init__()
+       
+        # LSTM layer
+        # If batch_first=False, input shape is (T, N, num_features)
+        self.lstm_layers = nn.LSTM(
+            input_size=num_features,
+            hidden_size=lstm_hidden_size,
+            num_layers=num_lstm_layers,
+            batch_first=False,
+            bidirectional=True
+
+        )
+       
+        
+        self.fc_block = TDSFullyConnectedBlock(2*lstm_hidden_size)
+        self.out_layer = nn.Linear(2*lstm_hidden_size, 128)
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.tds_conv_blocks(inputs)  # (T, N, num_features)
+        """
+        Forward pass for the TDSLSTMEncoder.
+
+        Args:
+            inputs (torch.Tensor): Input tensor of shape (T, N, num_features)
+                                   if batch_first=False.
+
+        Returns:
+            torch.Tensor: The output after the fully connected layer.
+        """
+        # LSTM returns (output, (h_n, c_n))
+        # output shape: (T, N, lstm_hidden_size) if batch_first=False
+        x, _ = self.lstm_layers(inputs)
+       
+        x = self.fc_block(x)
+
+        x= self.out_layer(x)
+        # Debug print
+        #print('Shape after TDSLSTMEncoder:', x.shape)
+       
+        return x
